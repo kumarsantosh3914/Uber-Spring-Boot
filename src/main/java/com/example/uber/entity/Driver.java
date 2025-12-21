@@ -51,7 +51,7 @@ public class Driver {
         updatedAt = LocalDate.now();
     }
 
-    @PrePersist
+    @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDate.now();
     }
