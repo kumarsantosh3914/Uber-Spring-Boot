@@ -1,7 +1,9 @@
 package com.example.uber.service.impl;
 
+import com.example.uber.client.GrpcClient;
 import com.example.uber.dto.BookingRequest;
 import com.example.uber.dto.BookingResponse;
+import com.example.uber.dto.DriverLocationDTO;
 import com.example.uber.entity.Booking;
 import com.example.uber.entity.Driver;
 import com.example.uber.entity.Passenger;
@@ -11,6 +13,8 @@ import com.example.uber.repository.DriverRepository;
 import com.example.uber.repository.PassengerRepository;
 import com.example.uber.service.BookingService;
 import com.example.uber.service.FareCalculationService;
+import com.example.uber.service.LocationService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +35,10 @@ public class BookingServiceImpl implements BookingService {
     private final DriverRepository driverRepository;
     private final BookingMapper bookingMapper;
     private final FareCalculationService fareCalculationService;
+    private final LocationService locationService;
+    private final GrpcClient grpcClient;
+
+    private static final Double NEARBY_DRIVER_RADIUS_KM = 5.0;
 
     @Override
     @Transactional(readOnly = true)
@@ -107,7 +115,42 @@ public class BookingServiceImpl implements BookingService {
         }
 
         Booking savedBooking = bookingRepository.save(booking);
+
+        // If no driver assigned, notify nearby drivers via gRPC
+        if (driver == null) {
+            notifyNearbyDrivers(savedBooking);
+        }
+
         return bookingMapper.toResponse(savedBooking);
+    }
+
+    /**
+     * Find nearby drivers and notify them about a new ride via gRPC.
+     */
+    private void notifyNearbyDrivers(Booking booking) {
+        try {
+            // Get nearby drivers from Redis
+            List<DriverLocationDTO> nearbyDrivers = locationService.getNearbyDrivers(
+                    Double.parseDouble(booking.getPickupLocationLatitude()),
+                    Double.parseDouble(booking.getPickupLocationLongitude()),
+                    NEARBY_DRIVER_RADIUS_KM);
+
+            if (!nearbyDrivers.isEmpty()) {
+                List<Integer> driverIds = nearbyDrivers.stream()
+                        .map(d -> Integer.parseInt(d.getDriverId()))
+                        .collect(Collectors.toList());
+
+                // Notify drivers via gRPC
+                grpcClient.notifyDriversForNewRide(
+                        booking.getPickupLocationLatitude(),
+                        booking.getPickupLocationLongitude(),
+                        booking.getId().intValue(),
+                        driverIds);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the booking creation
+            System.err.println("Failed to notify drivers: " + e.getMessage());
+        }
     }
 
     @Override
