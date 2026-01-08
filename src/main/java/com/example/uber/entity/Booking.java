@@ -44,6 +44,12 @@ public class Booking {
     @Column(nullable = true)
     private String dropoffLocation;
 
+    @Column(nullable = false)
+    private String dropoffLocationLatitude;
+
+    @Column(nullable = false)
+    private String dropoffLocationLongitude;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -82,4 +88,3 @@ public class Booking {
         CANCELED
     }
 }
-

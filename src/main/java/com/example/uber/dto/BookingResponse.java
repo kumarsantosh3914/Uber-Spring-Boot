@@ -23,6 +23,8 @@ public class BookingResponse {
     private Double pickupLocationLatitude;
     private Double pickupLocationLongitude;
     private String dropoffLocation;
+    private Double dropoffLocationLatitude;
+    private Double dropoffLocationLongitude;
     private Booking.BookingStatus status;
     private BigDecimal fare;
     private LocalDateTime createdAt;

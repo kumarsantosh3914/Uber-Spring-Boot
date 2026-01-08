@@ -10,10 +10,12 @@ import com.example.uber.repository.BookingRepository;
 import com.example.uber.repository.DriverRepository;
 import com.example.uber.repository.PassengerRepository;
 import com.example.uber.service.BookingService;
+import com.example.uber.service.FareCalculationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,7 @@ public class BookingServiceImpl implements BookingService {
     private final PassengerRepository passengerRepository;
     private final DriverRepository driverRepository;
     private final BookingMapper bookingMapper;
+    private final FareCalculationService fareCalculationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -71,22 +74,34 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingResponse create(BookingRequest request) {
         Passenger passenger = passengerRepository.findById(request.getPassengerId())
-                .orElseThrow(() -> new IllegalArgumentException("Passenger not found with id: " + request.getPassengerId()));
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Passenger not found with id: " + request.getPassengerId()));
 
         Driver driver = null;
-        if(request.getDriverId() != null) {
+        if (request.getDriverId() != null) {
             driver = driverRepository.findById(request.getDriverId())
-                    .orElseThrow(() -> new IllegalArgumentException("Driver not found with id: " + request.getDriverId()));
+                    .orElseThrow(
+                            () -> new IllegalArgumentException("Driver not found with id: " + request.getDriverId()));
 
-            if(!driver.getIsAvailable()) {
+            if (!driver.getIsAvailable()) {
                 throw new IllegalArgumentException("Driver with id: " + driver.getId() + " is not available");
             }
+        }
+
+        // Calculate fare if not provided
+        if (request.getFare() == null) {
+            BigDecimal calculatedFare = fareCalculationService.calculateFare(
+                    request.getPickupLocationLatitude(),
+                    request.getPickupLocationLongitude(),
+                    request.getDropoffLocationLatitude(),
+                    request.getDropoffLocationLongitude());
+            request.setFare(calculatedFare);
         }
 
         Booking booking = bookingMapper.toEntity(request, passenger, driver);
 
         // If driver is assigned, mark as unavailable
-        if(driver != null) {
+        if (driver != null) {
             driver.setIsAvailable(false);
             driverRepository.save(driver);
         }
@@ -101,23 +116,25 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found with id: " + id));
 
         Passenger passenger = passengerRepository.findById(request.getPassengerId())
-                .orElseThrow(() -> new IllegalArgumentException("Passenger not found with id: " + request.getPassengerId()));
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Passenger not found with id: " + request.getPassengerId()));
 
         Driver driver = null;
-        if(request.getDriverId() != null) {
+        if (request.getDriverId() != null) {
             driver = driverRepository.findById(request.getDriverId())
-                    .orElseThrow(() -> new IllegalArgumentException("Driver not found with id: " + request.getDriverId()));
+                    .orElseThrow(
+                            () -> new IllegalArgumentException("Driver not found with id: " + request.getDriverId()));
         }
 
         // Update driver availability if changed
         Driver previousDriver = booking.getDriver();
-        if(previousDriver != null && !previousDriver.equals(driver)) {
+        if (previousDriver != null && !previousDriver.equals(driver)) {
             previousDriver.setIsAvailable(true);
             driverRepository.save(previousDriver);
         }
 
-        if(driver != null && !driver.equals(previousDriver)) {
-            if(!driver.getIsAvailable()) {
+        if (driver != null && !driver.equals(previousDriver)) {
+            if (!driver.getIsAvailable()) {
                 throw new IllegalArgumentException("Driver with id: " + driver.getId() + " is not available");
             }
             driver.setIsAvailable(false);
@@ -137,20 +154,20 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(status);
 
         // Handle status-specific logic
-        if(status == Booking.BookingStatus.IN_PROGRESS && booking.getActualPickupTime() == null) {
+        if (status == Booking.BookingStatus.IN_PROGRESS && booking.getActualPickupTime() == null) {
             booking.setActualPickupTime(LocalDateTime.now());
-        } else if(status == Booking.BookingStatus.COMPLETED) {
+        } else if (status == Booking.BookingStatus.COMPLETED) {
             booking.setCompletedAt(LocalDateTime.now());
 
             // Release driver
-            if(booking.getDriver() != null) {
+            if (booking.getDriver() != null) {
                 Driver driver = booking.getDriver();
                 driver.setIsAvailable(true);
                 driverRepository.save(driver);
             }
-        } else if(status == Booking.BookingStatus.CANCELED) {
+        } else if (status == Booking.BookingStatus.CANCELED) {
             // Release driver
-            if(booking.getDriver() != null) {
+            if (booking.getDriver() != null) {
                 Driver driver = booking.getDriver();
                 driver.setIsAvailable(true);
                 driverRepository.save(driver);
@@ -170,8 +187,10 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Driver not found with id: " + driverId));
 
         booking.setDriver(driver);
-        driver.setIsAvailable(true);
+        booking.setStatus(Booking.BookingStatus.CONFIRMED);
+        driver.setIsAvailable(false);
         driverRepository.save(driver);
+        bookingRepository.save(booking);
 
         return true;
     }
@@ -182,7 +201,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found with id: " + id));
 
         // Release driver if assigned
-        if(booking.getDriver() != null) {
+        if (booking.getDriver() != null) {
             Driver driver = booking.getDriver();
             driver.setIsAvailable(true);
             driverRepository.save(driver);

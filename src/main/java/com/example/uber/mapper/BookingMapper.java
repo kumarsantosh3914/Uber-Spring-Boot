@@ -11,8 +11,7 @@ import org.springframework.stereotype.Component;
 public class BookingMapper {
 
     public Booking toEntity(BookingRequest request, Passenger passenger, Driver driver) {
-        Booking.BookingStatus status = driver != null ?
-                Booking.BookingStatus.CONFIRMED : Booking.BookingStatus.PENDING;
+        Booking.BookingStatus status = driver != null ? Booking.BookingStatus.CONFIRMED : Booking.BookingStatus.PENDING;
 
         return Booking.builder()
                 .passenger(passenger)
@@ -20,6 +19,8 @@ public class BookingMapper {
                 .pickupLocationLatitude(request.getPickupLocationLatitude().toString())
                 .pickupLocationLongitude(request.getPickupLocationLongitude().toString())
                 .dropoffLocation(request.getDropoffLocation())
+                .dropoffLocationLatitude(request.getDropoffLocationLatitude().toString())
+                .dropoffLocationLongitude(request.getDropoffLocationLongitude().toString())
                 .fare(request.getFare())
                 .status(status)
                 .scheduledPickupTime(request.getScheduledPickupTime())
@@ -36,6 +37,8 @@ public class BookingMapper {
                 .pickupLocationLatitude(Double.parseDouble(booking.getPickupLocationLatitude()))
                 .pickupLocationLongitude(Double.parseDouble(booking.getPickupLocationLongitude()))
                 .dropoffLocation(booking.getDropoffLocation())
+                .dropoffLocationLatitude(Double.parseDouble(booking.getDropoffLocationLatitude()))
+                .dropoffLocationLongitude(Double.parseDouble(booking.getDropoffLocationLongitude()))
                 .status(booking.getStatus())
                 .fare(booking.getFare())
                 .createdAt(booking.getCreatedAt())
@@ -52,11 +55,13 @@ public class BookingMapper {
         booking.setPickupLocationLatitude(request.getPickupLocationLatitude().toString());
         booking.setPickupLocationLongitude(request.getPickupLocationLongitude().toString());
         booking.setDropoffLocation(request.getDropoffLocation());
+        booking.setDropoffLocationLatitude(request.getDropoffLocationLatitude().toString());
+        booking.setDropoffLocationLongitude(request.getDropoffLocationLongitude().toString());
         booking.setFare(request.getFare());
         booking.setScheduledPickupTime(request.getScheduledPickupTime());
 
         // Update status based on driver assignment
-        if(driver != null && booking.getStatus() == Booking.BookingStatus.PENDING) {
+        if (driver != null && booking.getStatus() == Booking.BookingStatus.PENDING) {
             booking.setStatus(Booking.BookingStatus.CONFIRMED);
         }
     }

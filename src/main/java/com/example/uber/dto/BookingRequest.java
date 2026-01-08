@@ -24,6 +24,10 @@ public class BookingRequest {
     @NotNull(message = "Pickup location long is required")
     private Double pickupLocationLongitude;
     private String dropoffLocation;
+    @NotNull(message = "Dropoff location lat is required")
+    private Double dropoffLocationLatitude;
+    @NotNull(message = "Dropoff location long is required")
+    private Double dropoffLocationLongitude;
     private BigDecimal fare;
     private LocalDateTime scheduledPickupTime;
 }
